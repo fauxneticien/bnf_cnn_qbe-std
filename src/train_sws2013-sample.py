@@ -29,9 +29,14 @@ sws2013_sample_test = STD_Dataset(
 # Set up hyperparameters
 num_epochs = 1
 learning_rate = 0.001
+use_gpu = False
 
 # Set up model
 model = ConvNet()
+
+if (use_gpu):
+    model.cuda()
+
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 criterion = torch.nn.BCELoss()
 
@@ -47,15 +52,23 @@ for epoch in range(num_epochs):
     )
 
     for i_batch, sample_batched in enumerate(dataloader):
-        outputs = model(sample_batched['dists'])
-        loss = criterion(outputs, sample_batched['labels'])
-        accuracy = accuracy_score(np.round(outputs.detach()), sample_batched['labels'])
+        dists = sample_batched['dists']
+        labels = sample_batched['labels']
+
+        if (use_gpu):
+            dists, labels = dists.cuda(), labels.cuda()
 
         optimizer.zero_grad()
+        outputs = model(dists)
+        
+        loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
 
-        print('Epoch: [%d/%d], Loss: %.4f, Accuracy: %.2f' % (epoch+1, num_epochs, loss.data, accuracy))
+        accuracy = accuracy_score(np.round(outputs.cpu().detach()), labels.cpu())
+
+        if(i_batch % 100 == 0):
+            print('Epoch: [%d/%d], Batch: %d, Loss: %.4f, Accuracy: %.2f' % (epoch+1, num_epochs, i_batch, loss.data, accuracy))
 
 print('Testing model:')
 
