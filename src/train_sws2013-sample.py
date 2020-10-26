@@ -27,9 +27,9 @@ sws2013_sample_test = STD_Dataset(
 )
 
 # Set up hyperparameters
-num_epochs = 1
+num_epochs = 100
 learning_rate = 0.001
-use_gpu = False
+use_gpu = True
 
 # Set up model
 model = ConvNet()
@@ -46,7 +46,7 @@ for epoch in range(num_epochs):
 
     dataloader = DataLoader(
         sws2013_sample_train,
-        batch_size=4,
+        batch_size=20,
         shuffle=True,
         num_workers=0
     )
@@ -76,7 +76,13 @@ dataloader = DataLoader(sws2013_sample_test, batch_size = len(sws2013_sample_tes
 model.eval()
 
 for i_batch, sample_batched in enumerate(dataloader):
-    outputs = model(sample_batched['dists'])
-    accuracy = accuracy_score(np.round(outputs.detach()), sample_batched['labels'])
+    dists = sample_batched['dists']
+    labels = sample_batched['labels']
+
+    if (use_gpu):
+        dists, labels = dists.cuda(), labels.cuda()
+
+    outputs = model(dists)
+    accuracy = accuracy_score(np.round(outputs.cpu().detach()), labels.cpu())
 
     print('Test accuracy: %.2f' % accuracy)
