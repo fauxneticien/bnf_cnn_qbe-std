@@ -1,0 +1,26 @@
+# Metadata
+exp_id: 'sws2013-sample-train'
+
+artifacts:
+    dir: 'tmp/sws2013-sample-train'
+    log: 'output.log'
+
+model_name: 'ConvNet'
+mode: 'train'
+
+dataset:
+    root_dir: 'data/sws2013-sample'
+    labels_csv: 'train_labels.csv'
+    query_dir: 'train_queries'
+    audio_dir: 'references'
+
+use_gpu: True
+num_epochs: 20
+batch_size: 20
+
+optimizer: adam
+learning_rate: 0.001
+
+criterion: BCELoss
+
+loss_threshold: 0.1

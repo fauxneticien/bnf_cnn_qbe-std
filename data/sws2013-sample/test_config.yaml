@@ -1,0 +1,12 @@
+mode: 'eval'
+
+artifacts:
+    dir: 'tmp/sws2013-sample-test'
+    log: 'output.log'
+
+datasets:
+    - sws2013test:
+        root_dir: 'data/sws2013-sample'
+        labels_csv: 'test_labels.csv'
+        query_dir: 'test_queries'
+        audio_dir: 'references'

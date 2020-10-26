@@ -1,2 +1,5 @@
 data/sws2013
 .vscode
+tmp/*
+!tmp/.gitkeep
+src/__pycache__
