@@ -74,7 +74,7 @@ def save_model(epoch, model, optimizer, loss, output_dir, name = 'model.pt'):
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'loss': loss,
-        }, output_dir + 'model.pt')
+        }, os.path.join(output_dir, 'model.pt'))
 
 def train_model(config):
     output_dir = config['artifacts']['dir']
