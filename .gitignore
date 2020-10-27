@@ -3,3 +3,4 @@ data/sws2013
 tmp/*
 !tmp/.gitkeep
 src/__pycache__
+Taskfile.yml
