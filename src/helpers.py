@@ -15,8 +15,8 @@ def load_parameters(yaml_path):
 
     return config
 
-def load_std_datasets(dataset):
-    return STD_Dataset(dataset['root_dir'], dataset['labels_csv'], dataset['query_dir'], dataset['audio_dir'])
+def load_std_datasets(datasets):
+    return { ds_name:STD_Dataset(ds_attrs['root_dir'], ds_attrs['labels_csv'], ds_attrs['query_dir'], ds_attrs['audio_dir']) for (ds_name, ds_attrs) in datasets.items() }
 
 def setup_exp(config):
     output_dir = config['artifacts']['dir']
@@ -66,6 +66,16 @@ def load_saved_model(pt_path, model_name, mode = 'eval', use_gpu = False):
     
     return model
 
+def save_model(epoch, model, optimizer, loss, output_dir, name = 'model.pt'):
+    logging.info(" Saving model to '%s/model.pt'" % (output_dir))
+
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+        }, output_dir + 'model.pt')
+
 def train_model(config):
     output_dir = config['artifacts']['dir']
 
@@ -73,14 +83,29 @@ def train_model(config):
 
     logging.info(' Starting experiment %s' % (config['exp_id']))
 
-    logging.info(' Loading in data from %s' % (config['dataset']['root_dir']))
+    logging.info(' Loading in data from %s' % (config['datasets']['train']['root_dir']))
 
-    dataloader = DataLoader(
-        load_std_datasets(config['dataset']),
-        batch_size=config['batch_size'],
-        shuffle=True,
+    datasets = load_std_datasets(config['datasets'])
+
+    train_dat_loader = DataLoader(
+        dataset = datasets['train'],
+        batch_size = config['datasets']['train']['batch_size'],
+        shuffle = True,
         num_workers=0
     )
+
+    if('dev' in datasets.keys()):
+
+        dev_dat_loader = DataLoader(
+            dataset = datasets['dev'],
+            batch_size = config['datasets']['dev']['batch_size'],
+            shuffle = True,
+            num_workers=0
+        )
+
+    else:
+        # If no dev set defined, then no need to evaluate on dev set every nth epoch
+        config['eval_dev_epoch'] = None
 
     logging.info(" Instantiating model '%s'" % (config['model_name']))
 
@@ -88,7 +113,7 @@ def train_model(config):
 
     for epoch in range(config['num_epochs']):
 
-        for i_batch, sample_batched in enumerate(dataloader):
+        for i_batch, sample_batched in enumerate(train_dat_loader):
             dists = sample_batched['dists']
             labels = sample_batched['labels']
 
@@ -105,10 +130,37 @@ def train_model(config):
             accuracy = accuracy_score(np.round(outputs.cpu().detach()), labels.cpu())
 
             if(i_batch % 100 == 0):
-                logging.info(' Epoch: [%d/%d], Batch: %d, Loss: %.4f, Accuracy: %.2f' % (epoch+1, config['num_epochs'], i_batch+1, loss.data, accuracy))
+                logging.info(' Epoch: [%d/%d], Train Batch: %d, Train Batch Loss: %.4f, Train Batch Accuracy: %.2f' % (epoch+1, config['num_epochs'], i_batch+1, loss.data, accuracy))
 
-    logging.info(" Saving model to '%s/model.pt'" % (output_dir))
+        if(config['eval_dev_epoch'] is not None and epoch % config['eval_dev_epoch'] == 0):
 
-    torch.save(model.state_dict(), os.path.join(output_dir, 'model.pt'))
+            save_model(epoch, model, optimizer, loss, output_dir)
+
+            with torch.no_grad():
+                dev_losses = []
+                dev_accs = []
+
+                for j_batch, dev_batched in enumerate(dev_dat_loader):
+
+                    dists = dev_batched['dists']
+                    labels = dev_batched['labels']
+
+                    if (config['use_gpu']):
+                        dists, labels = dists.cuda(), labels.cuda()
+
+                    model.eval()
+                    outputs = model(dists)
+            
+                    dev_loss = criterion(outputs, labels).cpu().data
+                    dev_losses.append(dev_loss)
+
+                    dev_acc = accuracy_score(np.round(outputs.cpu().detach()), labels.cpu())
+                    dev_accs.append(dev_acc)
+
+                    logging.info(' Epoch: [%d/%d], Dev Batch %d, Dev Loss: %.4f, Dev Accuracy: %.2f' % (epoch+1, config['num_epochs'], j_batch + 1, dev_loss, dev_acc))
+
+            model.train()
+
+    save_model(epoch, model, optimizer, loss, output_dir)
 
     return model

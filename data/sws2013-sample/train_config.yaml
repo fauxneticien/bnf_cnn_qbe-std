@@ -8,15 +8,25 @@ artifacts:
 model_name: 'ConvNet'
 mode: 'train'
 
-dataset:
-    root_dir: 'data/sws2013-sample'
-    labels_csv: 'train_labels.csv'
-    query_dir: 'train_queries'
-    audio_dir: 'references'
+datasets:
+    train:
+        root_dir: 'data/sws2013-sample'
+        labels_csv: 'train_labels.csv'
+        query_dir: 'train_queries'
+        audio_dir: 'references'
+        batch_size: 20
+
+    dev:
+        root_dir: 'data/sws2013-sample'
+        labels_csv: 'test_labels.csv'
+        query_dir: 'test_queries'
+        audio_dir: 'references'
+        batch_size: 10
 
 use_gpu: True
-num_epochs: 20
-batch_size: 20
+num_epochs: 30
+# Evaluate model on dev set every 5 epochs
+eval_dev_epoch: 5
 
 optimizer: adam
 learning_rate: 0.001
