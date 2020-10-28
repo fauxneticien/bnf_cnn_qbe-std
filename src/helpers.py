@@ -151,7 +151,7 @@ def train_model(config):
 
             append_results_csv(os.path.join(output_dir, 'train_results.csv'),
             {
-                'epoch' : [epoch] * config['datasets']['train']['batch_size'],
+                'epoch' : [epoch] * len(sample_batched['query']),
                 'query' : sample_batched['query'],
                 'reference' : sample_batched['reference'],
                 'label' : sample_batched['labels'].reshape(-1).numpy().astype(int),
@@ -183,7 +183,7 @@ def train_model(config):
 
                     append_results_csv(os.path.join(output_dir, 'dev_results.csv'),
                     {
-                        'epoch' : [epoch] * config['datasets']['dev']['batch_size'],
+                        'epoch' : [epoch] * len(dev_batched['query']),
                         'query' : dev_batched['query'],
                         'reference' : dev_batched['reference'],
                         'label' : dev_batched['labels'].reshape(-1).numpy().astype(int),
