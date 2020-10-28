@@ -1,10 +1,11 @@
-import logging, os, sys, time, yaml
+import logging, os, sys, yaml
 
 import torch
 from torch.utils.data import DataLoader
 
+import pandas as pd
 import numpy as np
-from sklearn.metrics import accuracy_score
+from tqdm import tqdm
 
 from Models import ConvNet
 from Datasets import STD_Dataset
@@ -15,6 +16,14 @@ def load_parameters(yaml_path):
 
     return config
 
+def make_results_csv(csv_path):
+    t_df = pd.DataFrame(columns=['epoch', 'query','reference','label','pred'])
+    t_df.to_csv(csv_path, index = False)
+
+def append_results_csv(csv_path, results_dict):
+    df = pd.DataFrame(results_dict)
+    df.to_csv(csv_path, mode = 'a', header = False, index = False)
+
 def load_std_datasets(datasets):
     return { ds_name:STD_Dataset(ds_attrs['root_dir'], ds_attrs['labels_csv'], ds_attrs['query_dir'], ds_attrs['audio_dir']) for (ds_name, ds_attrs) in datasets.items() }
 
@@ -23,6 +32,8 @@ def setup_exp(config):
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
+    make_results_csv(os.path.join(output_dir, 'train_results.csv'))
 
     logging.basicConfig(
         filename = os.path.join(output_dir, config['artifacts']['log']),
@@ -72,7 +83,7 @@ def load_saved_model(pt_path, model_name, mode = 'eval', use_gpu = False):
     return model
 
 def save_model(epoch, model, optimizer, loss, output_dir, name = 'model.pt'):
-    logging.info(" Saving model to '%s/model.pt'" % (output_dir))
+    logging.info(" Saving model to '%s/model-e%d.pt'" % (output_dir, epoch))
 
     torch.save({
         'epoch': epoch,
@@ -101,10 +112,12 @@ def train_model(config):
 
     if('dev' in datasets.keys()):
 
+        make_results_csv(os.path.join(output_dir, 'dev_results.csv'))
+
         dev_dat_loader = DataLoader(
             dataset = datasets['dev'],
             batch_size = config['datasets']['dev']['batch_size'],
-            shuffle = True,
+            shuffle = False,
             num_workers=config['dl_num_workers']
         )
 
@@ -116,9 +129,11 @@ def train_model(config):
 
     model, optimizer, criterion = instantiate_model(config)
 
-    for epoch in range(config['num_epochs']):
+    for epoch in range(1, config['num_epochs'] + 1):
 
-        for i_batch, sample_batched in enumerate(train_dat_loader):
+        epoch_loss = 0
+
+        for i_batch, sample_batched in enumerate(tqdm(train_dat_loader)):
             dists = sample_batched['dists']
             labels = sample_batched['labels']
 
@@ -132,18 +147,29 @@ def train_model(config):
             loss.backward()
             optimizer.step()
 
-            accuracy = accuracy_score(np.round(outputs.cpu().detach()), labels.cpu())
+            epoch_loss += loss.data
 
-            if(i_batch % 100 == 0):
-                logging.info(' Epoch: [%d/%d], Train Batch: %d, Train Batch Loss: %.4f, Train Batch Accuracy: %.2f' % (epoch+1, config['num_epochs'], i_batch+1, loss.data, accuracy))
+            append_results_csv(os.path.join(output_dir, 'train_results.csv'),
+            {
+                'epoch' : [epoch] * config['datasets']['train']['batch_size'],
+                'query' : sample_batched['query'],
+                'reference' : sample_batched['reference'],
+                'label' : sample_batched['labels'].reshape(-1).numpy().astype(int),
+                'pred' : outputs.cpu().detach().reshape(-1).numpy().round(10)
+            })
 
-        if(config['eval_dev_epoch'] is not None and epoch % config['eval_dev_epoch'] == 0):
+        logging.info(' Epoch: [%d/%d], Loss: %.4f' % (epoch, config['num_epochs'], epoch_loss / (i_batch + 1)))
+
+        # Evaluate on dev set if not first epoch and current epoch divisible by eval_dev_epoch
+        if(config['eval_dev_epoch'] is not None and epoch > 1 and epoch % config['eval_dev_epoch'] == 0):
 
             save_model(epoch, model, optimizer, loss, output_dir)
 
             with torch.no_grad():
 
-                for j_batch, dev_batched in enumerate(dev_dat_loader):
+                dev_loss = 0
+
+                for j_batch, dev_batched in enumerate(tqdm(dev_dat_loader)):
                     dists = dev_batched['dists']
                     labels = dev_batched['labels']
 
@@ -152,14 +178,20 @@ def train_model(config):
 
                     model.eval()
                     outputs = model(dists)
-            
-                    dev_loss = criterion(outputs, labels).cpu().data
-                    dev_acc = accuracy_score(np.round(outputs.cpu().detach()), labels.cpu())
 
-                    logging.info(' Epoch: [%d/%d], Dev Batch %d, Dev Loss: %.4f, Dev Accuracy: %.2f' % (epoch+1, config['num_epochs'], j_batch + 1, dev_loss, dev_acc))
+                    dev_loss += criterion(outputs, labels).cpu().data
+
+                    append_results_csv(os.path.join(output_dir, 'dev_results.csv'),
+                    {
+                        'epoch' : [epoch] * config['datasets']['dev']['batch_size'],
+                        'query' : dev_batched['query'],
+                        'reference' : dev_batched['reference'],
+                        'label' : dev_batched['labels'].reshape(-1).numpy().astype(int),
+                        'pred' : outputs.cpu().detach().reshape(-1).numpy().round(10)
+                    })
+
+                logging.info(' Epoch: [%d/%d], Dev Loss: %.4f' % (epoch, config['num_epochs'], dev_loss / (j_batch + 1)))
 
             model.train()
-
-    save_model(epoch, model, optimizer, loss, output_dir)
 
     return model

@@ -15,14 +15,14 @@ datasets:
         labels_csv: 'train_labels.csv'
         query_dir: 'train_queries'
         audio_dir: 'references'
-        batch_size: 20
+        batch_size: 5
 
     dev:
         root_dir: 'data/sws2013-sample'
         labels_csv: 'test_labels.csv'
         query_dir: 'test_queries'
         audio_dir: 'references'
-        batch_size: 10
+        batch_size: 5
 
 use_gpu: True
 num_epochs: 50
@@ -30,7 +30,7 @@ num_epochs: 50
 eval_dev_epoch: 5
 
 optimizer: adam
-learning_rate: 0.01
+learning_rate: 0.001
 
 criterion: BCELoss
 

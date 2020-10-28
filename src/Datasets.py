@@ -59,13 +59,13 @@ class STD_Dataset(Dataset):
         qt_dists = np.take(qt_dists, ind_cols, axis = 1)
 
         # Create empty 100 x 800 matrix, then fill relevant cells with dist values
-        temp_dists = np.full((self.max_height, self.max_width), qt_dists.min(), dtype='float64')
+        temp_dists = np.full((self.max_height, self.max_width), qt_dists.min(), dtype='float32')
         temp_dists[:qt_dists.shape[0], :qt_dists.shape[1]] = qt_dists
 
         # Reshape to (1xHxW) since to feed into ConvNet with 1 input channel
         dists = torch.Tensor(temp_dists).view(1, self.max_height, self.max_width)
         label = torch.Tensor([qt_label])
 
-        sample = {'dists': dists, 'labels': label}
+        sample = {'query': query_name, 'reference': test_name, 'dists': dists, 'labels': label}
 
         return sample
