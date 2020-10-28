@@ -8,6 +8,7 @@ artifacts:
 model_name: 'ConvNet'
 mode: 'train'
 
+dl_num_workers: 4
 datasets:
     train:
         root_dir: 'data/sws2013-sample'
@@ -24,12 +25,12 @@ datasets:
         batch_size: 10
 
 use_gpu: True
-num_epochs: 30
+num_epochs: 50
 # Evaluate model on dev set every 5 epochs
 eval_dev_epoch: 5
 
 optimizer: adam
-learning_rate: 0.001
+learning_rate: 0.01
 
 criterion: BCELoss
 

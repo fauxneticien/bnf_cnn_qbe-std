@@ -1,4 +1,4 @@
-import logging, os, sys, yaml
+import logging, os, sys, time, yaml
 
 import torch
 from torch.utils.data import DataLoader
@@ -96,7 +96,7 @@ def train_model(config):
         dataset = datasets['train'],
         batch_size = config['datasets']['train']['batch_size'],
         shuffle = True,
-        num_workers=0
+        num_workers=config['dl_num_workers']
     )
 
     if('dev' in datasets.keys()):
@@ -105,7 +105,7 @@ def train_model(config):
             dataset = datasets['dev'],
             batch_size = config['datasets']['dev']['batch_size'],
             shuffle = True,
-            num_workers=0
+            num_workers=config['dl_num_workers']
         )
 
     else:
@@ -142,11 +142,8 @@ def train_model(config):
             save_model(epoch, model, optimizer, loss, output_dir)
 
             with torch.no_grad():
-                dev_losses = []
-                dev_accs = []
 
                 for j_batch, dev_batched in enumerate(dev_dat_loader):
-
                     dists = dev_batched['dists']
                     labels = dev_batched['labels']
 
@@ -157,10 +154,7 @@ def train_model(config):
                     outputs = model(dists)
             
                     dev_loss = criterion(outputs, labels).cpu().data
-                    dev_losses.append(dev_loss)
-
                     dev_acc = accuracy_score(np.round(outputs.cpu().detach()), labels.cpu())
-                    dev_accs.append(dev_acc)
 
                     logging.info(' Epoch: [%d/%d], Dev Batch %d, Dev Loss: %.4f, Dev Accuracy: %.2f' % (epoch+1, config['num_epochs'], j_batch + 1, dev_loss, dev_acc))
 
