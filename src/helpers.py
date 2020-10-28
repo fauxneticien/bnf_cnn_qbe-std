@@ -163,8 +163,6 @@ def train_model(config):
         # Evaluate on dev set if not first epoch and current epoch divisible by eval_dev_epoch
         if(config['eval_dev_epoch'] is not None and epoch > 1 and epoch % config['eval_dev_epoch'] == 0):
 
-            save_model(epoch, model, optimizer, loss, output_dir)
-
             with torch.no_grad():
 
                 dev_loss = 0
@@ -193,5 +191,7 @@ def train_model(config):
                 logging.info(' Epoch: [%d/%d], Dev Loss: %.4f' % (epoch, config['num_epochs'], dev_loss / (j_batch + 1)))
 
             model.train()
+
+        save_model(epoch, model, optimizer, loss, output_dir)
 
     return model
