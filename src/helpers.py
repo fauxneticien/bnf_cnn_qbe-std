@@ -40,6 +40,11 @@ def instantiate_model(config):
     constructor = globals()[config['model_name']]
     model = constructor()
 
+    if('model_start' in config.keys()):
+        logging.info(" Loading model from '%s'" % (config['model_start']))
+
+        model.load_state_dict(torch.load(config['model_start']))
+
     if config['use_gpu']:
         model.cuda()
 
