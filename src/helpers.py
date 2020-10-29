@@ -118,7 +118,7 @@ def save_model(epoch, model, optimizer, loss, output_dir, name = 'model.pt'):
     if not os.path.exists(cps_path):
         os.makedirs(cps_path)
 
-    logging.info(" Saving model to '%s/%s'" % (output_dir, cp_name))
+    logging.info(" Saving model to '%s/%s'" % (cps_path, cp_name))
 
     torch.save({
         'epoch': epoch,
