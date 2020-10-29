@@ -16,16 +16,38 @@ def load_parameters(yaml_path):
 
     return config
 
-def make_results_csv(csv_path):
-    t_df = pd.DataFrame(columns=['epoch', 'query','reference','label','pred'])
-    t_df.to_csv(csv_path, index = False)
-
-def append_results_csv(csv_path, results_dict):
-    df = pd.DataFrame(results_dict)
-    df.to_csv(csv_path, mode = 'a', header = False, index = False)
-
 def load_std_datasets(datasets):
-    return { ds_name:STD_Dataset(ds_attrs['root_dir'], ds_attrs['labels_csv'], ds_attrs['query_dir'], ds_attrs['audio_dir']) for (ds_name, ds_attrs) in datasets.items() }
+    return {
+        ds_name:STD_Dataset(
+            root_dir = ds_attrs['root_dir'],
+            labels_csv = ds_attrs['labels_csv'],
+            query_dir = ds_attrs['query_dir'],
+            audio_dir = ds_attrs['audio_dir']
+        ) for (ds_name, ds_attrs) in datasets.items()
+    }
+
+def create_data_loaders(loaded_datasets, config):
+    return {
+        ds_name:DataLoader(
+            dataset = dataset,
+            batch_size = config['datasets'][ds_name]['batch_size'],
+            shuffle = True if ds_name == 'train' else False,
+            num_workers = config['dl_num_workers']
+        ) for (ds_name, dataset) in loaded_datasets.items()
+    }
+
+def load_saved_model(config):
+
+    model, optimizer, criterion = instantiate_model(config)
+
+    logging.info(" Loading model from '%s'" % (config['model_path']))
+    checkpoint = torch.load(config['model_path'])
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    if(config['mode'] == 'train'):
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    return model, optimizer, criterion
 
 def setup_exp(config):
     output_dir = config['artifacts']['dir']
@@ -33,7 +55,8 @@ def setup_exp(config):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    make_results_csv(os.path.join(output_dir, 'train_results.csv'))
+    if(config['mode'] == 'train'):
+        make_results_csv(os.path.join(output_dir, 'train_results.csv'))
 
     logging.basicConfig(
         filename = os.path.join(output_dir, config['artifacts']['log']),
@@ -47,14 +70,13 @@ def setup_exp(config):
     with open(os.path.join(output_dir, 'config.yaml'), 'w') as f:
         yaml.dump(config, f)
 
+    return output_dir
+
 def instantiate_model(config):
     constructor = globals()[config['model_name']]
     model = constructor()
 
-    if('model_start' in config.keys()):
-        logging.info(" Loading model from '%s'" % (config['model_start']))
-
-        model.load_state_dict(torch.load(config['model_start']))
+    logging.info(" Instantiating model '%s'" % (config['model_name']))
 
     if config['use_gpu']:
         model.cuda()
@@ -75,123 +97,84 @@ def instantiate_model(config):
         
         return model, None, None
 
-def load_saved_model(pt_path, model_name, mode = 'eval', use_gpu = False):
+def make_results_csv(csv_path, headers = 'train'):
+    if (headers == 'train'):
+        csv_cols = ['epoch', 'query','reference','label','pred']
+    elif (headers == 'eval'):
+        csv_cols = ['query','reference','label','pred']
 
-    model, _, _ = instantiate_model(model_name, mode, config = {"use_gpu": use_gpu})
-    model.load_state_dict(torch.load(pt_path))
-    
-    return model
+    t_df = pd.DataFrame(columns=csv_cols)
+    t_df.to_csv(csv_path, index = False)
+    return csv_path
+
+def append_results_csv(csv_path, results_dict):
+    df = pd.DataFrame(results_dict)
+    df.to_csv(csv_path, mode = 'a', header = False, index = False)
 
 def save_model(epoch, model, optimizer, loss, output_dir, name = 'model.pt'):
-    logging.info(" Saving model to '%s/model-e%d.pt'" % (output_dir, epoch))
+    cps_path = os.path.join(output_dir, 'checkpoints')
+    cp_name  = "model-e%s.pt" % (str(epoch).zfill(3))
+
+    if not os.path.exists(cps_path):
+        os.makedirs(cps_path)
+
+    logging.info(" Saving model to '%s/%s'" % (output_dir, cp_name))
 
     torch.save({
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'loss': loss,
-        }, os.path.join(output_dir, 'model.pt'))
-
-def train_model(config):
-    output_dir = config['artifacts']['dir']
-
-    setup_exp(config)
-
-    logging.info(' Starting experiment %s' % (config['exp_id']))
-
-    logging.info(' Loading in data from %s' % (config['datasets']['train']['root_dir']))
-
-    datasets = load_std_datasets(config['datasets'])
-
-    train_dat_loader = DataLoader(
-        dataset = datasets['train'],
-        batch_size = config['datasets']['train']['batch_size'],
-        shuffle = True,
-        num_workers=config['dl_num_workers']
+        }, os.path.join(cps_path, cp_name)
     )
 
-    if('dev' in datasets.keys()):
-
-        make_results_csv(os.path.join(output_dir, 'dev_results.csv'))
-
-        dev_dat_loader = DataLoader(
-            dataset = datasets['dev'],
-            batch_size = config['datasets']['dev']['batch_size'],
-            shuffle = False,
-            num_workers=config['dl_num_workers']
-        )
-
+def run_model(model, mode, ds_loader, use_gpu, csv_path, keep_loss, criterion, optimizer, epoch):
+    if keep_loss is True:
+        total_loss = 0
     else:
-        # If no dev set defined, then no need to evaluate on dev set every nth epoch
-        config['eval_dev_epoch'] = None
+        # Set to None for referencing in return
+        loss = None
 
-    logging.info(" Instantiating model '%s'" % (config['model_name']))
+    for batch_index, batch_data in enumerate(tqdm(ds_loader)):
+        dists  = batch_data['dists']
+        labels = batch_data['labels']
 
-    model, optimizer, criterion = instantiate_model(config)
+        if (use_gpu):
+            dists, labels = dists.cuda(), labels.cuda()
 
-    for epoch in range(1, config['num_epochs'] + 1):
-
-        epoch_loss = 0
-
-        for i_batch, sample_batched in enumerate(tqdm(train_dat_loader)):
-            dists = sample_batched['dists']
-            labels = sample_batched['labels']
-
-            if (config['use_gpu']):
-                dists, labels = dists.cuda(), labels.cuda()
-
-            optimizer.zero_grad()
-            outputs = model(dists)
-            
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            epoch_loss += loss.data
-
-            append_results_csv(os.path.join(output_dir, 'train_results.csv'),
-            {
-                'epoch' : [epoch] * len(sample_batched['query']),
-                'query' : sample_batched['query'],
-                'reference' : sample_batched['reference'],
-                'label' : sample_batched['labels'].reshape(-1).numpy().astype(int),
-                'pred' : outputs.cpu().detach().reshape(-1).numpy().round(10)
-            })
-
-        logging.info(' Epoch: [%d/%d], Loss: %.4f' % (epoch, config['num_epochs'], epoch_loss / (i_batch + 1)))
-
-        # Evaluate on dev set if not first epoch and current epoch divisible by eval_dev_epoch
-        if(config['eval_dev_epoch'] is not None and epoch > 1 and epoch % config['eval_dev_epoch'] == 0):
-
-            with torch.no_grad():
-
-                dev_loss = 0
-
-                for j_batch, dev_batched in enumerate(tqdm(dev_dat_loader)):
-                    dists = dev_batched['dists']
-                    labels = dev_batched['labels']
-
-                    if (config['use_gpu']):
-                        dists, labels = dists.cuda(), labels.cuda()
-
-                    model.eval()
-                    outputs = model(dists)
-
-                    dev_loss += criterion(outputs, labels).cpu().data
-
-                    append_results_csv(os.path.join(output_dir, 'dev_results.csv'),
-                    {
-                        'epoch' : [epoch] * len(dev_batched['query']),
-                        'query' : dev_batched['query'],
-                        'reference' : dev_batched['reference'],
-                        'label' : dev_batched['labels'].reshape(-1).numpy().astype(int),
-                        'pred' : outputs.cpu().detach().reshape(-1).numpy().round(10)
-                    })
-
-                logging.info(' Epoch: [%d/%d], Dev Loss: %.4f' % (epoch, config['num_epochs'], dev_loss / (j_batch + 1)))
-
+        if(mode == 'train'):
             model.train()
+            optimizer.zero_grad()
+        
+        elif(mode == 'eval'):
+            model.eval()
 
-        save_model(epoch, model, optimizer, loss, output_dir)
+        outputs = model(dists)
 
-    return model
+        if keep_loss is True:
+            loss        = criterion(outputs, labels)
+            total_loss += loss.cpu().data
+
+            if(mode == 'train'):
+                loss.backward()
+                optimizer.step()
+
+        batch_output = {}
+
+        if(epoch is not None):
+            batch_output['epoch'] = [epoch] * len(batch_data['query'])
+
+        batch_output['query'] = batch_data['query']
+        batch_output['reference'] = batch_data['reference']
+        batch_output['label'] = batch_data['labels'].reshape(-1).numpy().astype(int)
+        batch_output['pred'] = outputs.cpu().detach().reshape(-1).numpy().round(10)
+
+        append_results_csv(csv_path, batch_output)
+
+    if keep_loss is True:
+        mean_loss = total_loss / len(ds_loader)
+    else:
+        # Set to None for referencing in return
+        mean_loss = None
+
+    return model, optimizer, criterion, loss, mean_loss

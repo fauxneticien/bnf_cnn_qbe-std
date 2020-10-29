@@ -1,37 +1,50 @@
-# Metadata
+# Experiment metadata
 exp_id: 'sws2013-sample-train'
+exp_notes: |
+    Sample training config file for GitHub repo.
+    This file will be copied into the artifacts directory at run time.
 
+# Experiment hyperparameters
+
+## Model name must match one of the model classes in src/Models.py
+model_name: 'ConvNet'
+num_epochs: 60
+optimizer: adam
+learning_rate: 0.001
+criterion: BCELoss
+
+# Run-time parameters 
+## Where to out log files, train and dev results, model checkpoints
 artifacts:
     dir: 'tmp/sws2013-sample-train'
     log: 'output.log'
 
-model_name: 'ConvNet'
+## Use GPU? (Specifically, CUDA)
+use_gpu: False
+## Set mode of experiment (train or eval)
 mode: 'train'
+## Evaluate model on dev set every 10 epochs
+eval_dev_epoch: 10
+## Save model every 10 epochs
+save_epoch: 10
 
+# Data-related parameters
+
+## How many workers to use with PyTorch data loader
 dl_num_workers: 4
+## Note for training datasets must be named exactly 'train' (and optionally 'dev')
+## For eval mode, you can supply as many datasets you'd like to test on with whatever names
 datasets:
     train:
         root_dir: 'data/sws2013-sample'
         labels_csv: 'train_labels.csv'
         query_dir: 'train_queries'
         audio_dir: 'references'
-        batch_size: 5
+        batch_size: 20
 
     dev:
         root_dir: 'data/sws2013-sample'
         labels_csv: 'test_labels.csv'
         query_dir: 'test_queries'
         audio_dir: 'references'
-        batch_size: 5
-
-use_gpu: True
-num_epochs: 50
-# Evaluate model on dev set every 5 epochs
-eval_dev_epoch: 5
-
-optimizer: adam
-learning_rate: 0.001
-
-criterion: BCELoss
-
-loss_threshold: 0.1
+        batch_size: 10

@@ -1,12 +1,26 @@
-mode: 'eval'
+# Experiment metadata
+exp_id: 'sws2013-sample-test'
+exp_notes: |
+    Assuming you've run training on the sws2013-sample dataset with
+    the provided 'train_config.yaml' file, so there's a model-e045.pt
+    in the relevant folder.
 
 artifacts:
     dir: 'tmp/sws2013-sample-test'
     log: 'output.log'
 
+model_name: 'ConvNet'
+model_path: 'tmp/sws2013-sample-train/checkpoints/model-e060.pt'
+mode: 'eval'
+
+use_gpu: False
+
+dl_num_workers: 4
 datasets:
-    - sws2013test:
+    sws2013_sample_test:
+        # Yes, the dev and test data are the same in this example.
         root_dir: 'data/sws2013-sample'
         labels_csv: 'test_labels.csv'
         query_dir: 'test_queries'
         audio_dir: 'references'
+        batch_size: 5
