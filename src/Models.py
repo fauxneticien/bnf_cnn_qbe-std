@@ -6,6 +6,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.utils.data import TensorDataset, DataLoader
 
+# Architecture taken from original code here: https://github.com/idiap/CNN_QbE_STD/blob/master/Model_Query_Detection_DTW_CNN.py
+
 class ConvNet(nn.Module):
     def __init__(self, depth = 30, dropout=0.1):
         super(ConvNet, self).__init__()
