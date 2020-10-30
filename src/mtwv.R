@@ -11,9 +11,9 @@
 #
 # See function definition below for full argument list
 
-if(!"tidyverse" %in% installed.packages()) { install.packages("tidyverse")  }
+if(!"dplyr" %in% installed.packages()) { install.packages("dplyr")  }
 
-library(magrittr)
+suppressMessages(library(dplyr))
 
 mtwv <- function(exp_results, refs_seconds, cost_false_alarm = 1, cost_missed_detection = 100, th_start = 0.7, th_end = 0.95, th_step = 0.05) {
   
