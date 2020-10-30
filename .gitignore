@@ -1,4 +1,5 @@
-data/sws2013
+data/*
+!data/sws2013-sample
 .vscode
 tmp/*
 !tmp/.gitkeep

@@ -83,7 +83,7 @@ if(any(stringr::str_detect(args, "mtwv.R"))) {
       .f = function(epoch_results, epoch_no) {
         
         dplyr::bind_cols(
-          tibble::tibble(epoch = epoch_no),
+          tibble::tibble(epoch = as.integer(epoch_no)),
           do.call("mtwv", list(epoch_results, func_params))
         )
         
