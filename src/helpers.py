@@ -2,6 +2,7 @@ import logging, os, sys, yaml
 
 import torch
 from torch.utils.data import DataLoader
+import torch.nn as nn
 
 import pandas as pd
 import numpy as np
@@ -46,6 +47,9 @@ def load_saved_model(config):
     
     if(config['mode'] == 'train'):
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    if config['mode'] == 'eval' and config['use_gpu'] and torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
 
     return model, optimizer, criterion
 
