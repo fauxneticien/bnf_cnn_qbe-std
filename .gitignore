@@ -3,5 +3,5 @@ data/*
 .vscode
 tmp/*
 !tmp/.gitkeep
-src/__pycache__
+__pycache__/
 Taskfile.yml
