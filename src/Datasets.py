@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 from scipy.spatial.distance import cdist
+import logging
 
 class STD_Dataset(Dataset):
     """Spoken Term Detection dataset."""
@@ -31,6 +32,28 @@ class STD_Dataset(Dataset):
             # in a 'vad_labels' directory
             self.vad_query_dir = os.path.join(root_dir, 'vad_labels', query_dir)
             self.vad_audio_dir = os.path.join(root_dir, 'vad_labels', audio_dir)
+
+            # Get filenames in audio and query directories
+            q_files = os.listdir(self.vad_query_dir)
+            a_files = os.listdir(self.vad_audio_dir)
+
+            # Get length of non-zero values in files
+            q_vlens = np.array([ len(np.flatnonzero(np.load(os.path.join(self.vad_query_dir, f)))) for f in q_files ])
+            a_vlens = np.array([ len(np.flatnonzero(np.load(os.path.join(self.vad_audio_dir, f)))) for f in a_files ])
+
+            # Get files (without .npy extensions) for which there are no non-zero values
+            zero_qs = [ os.path.splitext(x)[0] for x in np.take(q_files, np.where(q_vlens == 0)).flatten() ]
+            zero_as = [ os.path.splitext(x)[0] for x in np.take(a_files, np.where(a_vlens == 0)).flatten() ]
+
+            if(len(zero_qs) > 0):
+                logging.info(" Following queries removed from dataset (insufficient frames after VAD): %s" % (", ".join(zero_qs)))
+
+            if(len(zero_as) > 0):
+                logging.info(" Following references removed from dataset (insufficient frames after VAD): %s" % (", ".join(zero_as)))
+
+            # Discard from labels irrelevant files
+            self.qtl_frame = self.qtl_frame[~self.qtl_frame['query'].isin(zero_qs)]
+            self.qtl_frame = self.qtl_frame[~self.qtl_frame['reference'].isin(zero_as)]
 
     def __len__(self):
         return len(self.qtl_frame)
