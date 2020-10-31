@@ -17,13 +17,14 @@ def load_parameters(yaml_path):
 
     return config
 
-def load_std_datasets(datasets):
+def load_std_datasets(datasets, apply_vad):
     return {
         ds_name:STD_Dataset(
             root_dir = ds_attrs['root_dir'],
             labels_csv = ds_attrs['labels_csv'],
             query_dir = ds_attrs['query_dir'],
-            audio_dir = ds_attrs['audio_dir']
+            audio_dir = ds_attrs['audio_dir'],
+            apply_vad = apply_vad
         ) for (ds_name, ds_attrs) in datasets.items()
     }
 

@@ -9,7 +9,7 @@ config     = load_parameters(config_file)
 output_dir = setup_exp(config)
 
 # Load datasets
-datasets    = load_std_datasets(config['datasets'])
+datasets    = load_std_datasets(config['datasets'], config['apply_vad'])
 dataloaders = create_data_loaders(datasets, config)
 
 # If configured to load a previous model...

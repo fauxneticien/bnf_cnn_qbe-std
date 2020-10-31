@@ -8,7 +8,7 @@ from scipy.spatial.distance import cdist
 class STD_Dataset(Dataset):
     """Spoken Term Detection dataset."""
 
-    def __init__(self, root_dir, labels_csv, query_dir, audio_dir, max_height = 100, max_width = 800):
+    def __init__(self, root_dir, labels_csv, query_dir, audio_dir, apply_vad = False, max_height = 100, max_width = 800):
         """
         Args:
             root_dir (string): Absolute path to dataset directory with content below
@@ -17,11 +17,20 @@ class STD_Dataset(Dataset):
             query_dir (string): Relative path to directory with all the audio queries.
             audio_dir (string): Relative path to directory with all the test audio.
         """
-        self.qtl_frame = pd.read_csv(os.path.join(root_dir, labels_csv))
-        self.query_dir = os.path.join(root_dir, query_dir)
-        self.audio_dir = os.path.join(root_dir, audio_dir)
+        self.qtl_frame  = pd.read_csv(os.path.join(root_dir, labels_csv))
+        self.query_dir  = os.path.join(root_dir, query_dir)
+        self.audio_dir  = os.path.join(root_dir, audio_dir)
+        self.apply_vad  = apply_vad
         self.max_height = max_height
         self.max_width  = max_width
+
+        if apply_vad is True:
+            # If using voice activity detection we expect same directory structure
+            # and file names as feature files for .npy files containing voice activity
+            # detection (VAD) labels (0 = no speech activity, 1 = speech activity)
+            # in a 'vad_labels' directory
+            self.vad_query_dir = os.path.join(root_dir, 'vad_labels', query_dir)
+            self.vad_audio_dir = os.path.join(root_dir, 'vad_labels', audio_dir)
 
     def __len__(self):
         return len(self.qtl_frame)
@@ -37,6 +46,14 @@ class STD_Dataset(Dataset):
         # Get features where query = M x f, test = N x f, where M, N number of frames and f number of features
         query_feats = np.load(os.path.join(self.query_dir, query_name + ".npy"), allow_pickle=True)
         test_feats  = np.load(os.path.join(self.audio_dir, test_name + ".npy"), allow_pickle=True)
+
+        if self.apply_vad is True:
+            query_vads = np.load(os.path.join(self.vad_query_dir, query_name + ".npy"), allow_pickle=True)
+            test_vads  = np.load(os.path.join(self.vad_audio_dir, test_name + ".npy"), allow_pickle=True)
+
+            # Keep only frames (rows, axis = 0) where voice activity detection by rVAD has returned non-zero (i.e. 1)
+            query_feats = np.take(query_feats, np.flatnonzero(query_vads), axis = 0)
+            test_feats  = np.take(test_feats, np.flatnonzero(test_vads), axis = 0)
 
         # Create standardised Euclidean distance matrix of dimensions M x N
         qt_dists    = cdist(query_feats, test_feats, 'seuclidean', V = None)

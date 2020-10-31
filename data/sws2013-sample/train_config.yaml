@@ -12,6 +12,7 @@ num_epochs: 60
 optimizer: adam
 learning_rate: 0.001
 criterion: BCELoss
+apply_vad: True
 
 # Run-time parameters 
 ## Where to out log files, train and dev results, model checkpoints
