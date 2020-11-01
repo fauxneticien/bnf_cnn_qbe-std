@@ -72,15 +72,17 @@ elif(config['mode'] == 'train'):
 
     for epoch in range(1, config['num_epochs'] + 1):
 
-        if type(config['labels_csv']) is 'dict':
+        if isinstance(config['datasets']['train']['labels_csv'], dict):
             # If separate positive and negative label CSV files supplied, re-sample negatives at each epoch
-            datasets['train']    = load_std_datasets(config['datasets']['train'], config['apply_vad'])
-            dataloaders['train'] = create_data_loaders(datasets['train'], config)
+            epoch_train_ds = load_std_datasets({'train' : config['datasets']['train']}, config['apply_vad'])
+            epoch_train_dl = create_data_loaders(epoch_train_ds, config)['train']
+        else:
+            epoch_train_dl = dataloaders['train']
 
         model, optimizer, criterion, loss, mean_loss = run_model(
             model = model,
             mode = 'train',
-            ds_loader = dataloaders['train'],
+            ds_loader = epoch_train_dl,
             use_gpu = config['use_gpu'],
             csv_path = train_csv_path,
             keep_loss = True,

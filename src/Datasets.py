@@ -19,7 +19,7 @@ class STD_Dataset(Dataset):
             audio_dir (string): Relative path to directory with all the test audio.
         """
 
-        if type(labels_csv) is 'dict':
+        if isinstance(labels_csv, dict):
             # Supplying separate csv files for positive and negative labels
             pos_frame   = pd.read_csv(os.path.join(root_dir, labels_csv['positive_labels']))
             neg_frame   = pd.read_csv(os.path.join(root_dir, labels_csv['negative_labels']))
