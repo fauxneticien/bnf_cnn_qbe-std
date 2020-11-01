@@ -1,4 +1,5 @@
 from helpers import *
+import re
 
 config_file = sys.argv[1]
 
@@ -12,37 +13,54 @@ output_dir = setup_exp(config)
 datasets    = load_std_datasets(config['datasets'], config['apply_vad'])
 dataloaders = create_data_loaders(datasets, config)
 
-# If configured to load a previous model...
-if('model_path' in config.keys()):
-    model, optimizer, criterion = load_saved_model(config)
-# If no previous model specified then load a new one according to config file
-else:
-    model, optimizer, criterion = instantiate_model(config)
-
 if(config['mode'] == 'eval'):
 
     for ds_name, ds_loader in dataloaders.items():
 
-        csv_path = make_results_csv(os.path.join(output_dir, ds_name + '-results.csv'), headers = 'eval')
+        logging.info(" Starting evaluation on dataset '%s'" % (ds_name))
+        csv_path = make_results_csv(os.path.join(output_dir, ds_name + '-results.csv'))
         logging.info(" Creating output file at '%s'" % (csv_path))
 
-        logging.info(" Starting evaluation on dataset '%s'" % (ds_name))
-        
-        with torch.no_grad():
+        model_paths = []
 
-            run_model(
-                model = model,
-                mode = 'eval',
-                ds_loader = ds_loader,
-                use_gpu = config['use_gpu'],
-                csv_path = csv_path,
-                keep_loss = False,
-                criterion = None,
-                epoch = None,
-                optimizer = None
-            )
+        # If configured to load a single model...
+        if os.path.isfile(config['model_path']):
+            model_paths.append(config['model_path'])
+
+        # If given a directory of model checkpoints
+        elif os.path.isdir(config['model_path']):
+            model_paths = [ os.path.join(config['model_path'], m) for m in os.listdir(config['model_path']) ]
+            model_paths.sort()
+
+        for model_path in model_paths:
+
+            epoch = int(re.search('model-e(\d+).pt', model_path).group(1))
+            config['model_path'] = model_path
+            
+            model, _, _ = load_saved_model(config)
+
+            with torch.no_grad():
+
+                run_model(
+                    model = model,
+                    mode = 'eval',
+                    ds_loader = ds_loader,
+                    use_gpu = config['use_gpu'],
+                    csv_path = csv_path,
+                    keep_loss = False,
+                    criterion = None,
+                    epoch = epoch,
+                    optimizer = None
+                )
 
 elif(config['mode'] == 'train'):
+
+    # If configured to load a previous model...
+    if('model_path' in config.keys()):
+        model, optimizer, criterion = load_saved_model(config)
+    # If no previous model specified then load a new one according to config file
+    else:
+        model, optimizer, criterion = instantiate_model(config)
 
     train_csv_path = make_results_csv(os.path.join(output_dir, 'train_results.csv'), headers = 'train')
 
