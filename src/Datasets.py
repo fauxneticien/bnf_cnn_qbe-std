@@ -18,7 +18,19 @@ class STD_Dataset(Dataset):
             query_dir (string): Relative path to directory with all the audio queries.
             audio_dir (string): Relative path to directory with all the test audio.
         """
-        self.qtl_frame  = pd.read_csv(os.path.join(root_dir, labels_csv))
+
+        if type(labels_csv) is 'dict':
+            # Supplying separate csv files for positive and negative labels
+            pos_frame   = pd.read_csv(os.path.join(root_dir, labels_csv['positive_labels']))
+            neg_frame   = pd.read_csv(os.path.join(root_dir, labels_csv['negative_labels']))
+            # Randomly down-sample neg examples to same number of positive examples
+            neg_frame   = neg_frame.sample(n = pos_frame.shape[0])
+
+            self.qtl_frame = pd.concat([pos_frame, neg_frame], axis = 0).sample(frac = 1)
+        else:
+            # If a single CSV file, then just read that in
+            self.qtl_frame  = pd.read_csv(os.path.join(root_dir, labels_csv))
+
         self.query_dir  = os.path.join(root_dir, query_dir)
         self.audio_dir  = os.path.join(root_dir, audio_dir)
         self.apply_vad  = apply_vad
