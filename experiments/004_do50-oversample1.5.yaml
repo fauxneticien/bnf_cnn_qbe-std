@@ -7,6 +7,7 @@ exp_notes: |
 
 # Experiment hyperparameters
 model_name: 'ConvNet'
+model_path: 'tmp/sws2013-train-do50/checkpoints/model-e005.pt'
 num_epochs: 50
 optimizer: adam
 learning_rate: 0.001
