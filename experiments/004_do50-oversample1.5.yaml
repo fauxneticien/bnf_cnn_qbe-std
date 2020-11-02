@@ -1,10 +1,9 @@
 # Experiment metadata
-exp_id: 'sws2013-train-do50-undersample'
+exp_id: 'sws2013-train-do50-oversample1.5'
 exp_notes: |
-    VAD doesn't seem to have done much. Let's re-train first model
-    but with sample different negative examples at each epoch.
-    Code adjusted so 'labels_csv' can accept separate csv files
-    for positive and negative labels
+    Try also over-sampling positive examples.
+    Here we duplicate a random 50% of the positive examples at each epoch.
+    Then randomly sample negative examples to match amount of positive examples.
 
 # Experiment hyperparameters
 model_name: 'ConvNet'
@@ -16,7 +15,7 @@ apply_vad: False
 
 # Run-time parameters 
 artifacts:
-    dir: 'tmp/do50-undersample'
+    dir: 'tmp/do50-oversample1_5'
     log: 'output.log'
 use_gpu: True
 mode: 'train'
@@ -33,7 +32,7 @@ datasets:
         labels_csv:
             positive_labels: 'train_labels_pos.csv'
             negative_labels: 'train_labels_neg.csv'
-            pos_sample_size: 1
+            pos_sample_size: 1.5
         query_dir: 'dev_queries'
         audio_dir: 'Audio'
         batch_size: 20
