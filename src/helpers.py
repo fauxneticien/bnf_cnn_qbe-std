@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from Models import ConvNet
+from Models import *
 from Datasets import STD_Dataset
 
 def load_parameters(yaml_path):
