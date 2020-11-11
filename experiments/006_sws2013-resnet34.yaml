@@ -1,0 +1,43 @@
+# Experiment metadata
+exp_id: 'sws2013-resnet34'
+exp_notes: |
+    Try using resnet instead of vgg
+
+# Experiment hyperparameters
+model_name: 'ResNet34'
+num_epochs: 50
+optimizer: adam
+learning_rate: 0.0001
+criterion: BCELoss
+apply_vad: False
+
+# Run-time parameters 
+artifacts:
+    dir: 'tmp/sws2013-resnet34'
+    log: 'output.log'
+use_gpu: True
+mode: 'train'
+# Evaluate model on dev set every 5 epochs
+eval_dev_epoch: 5
+## Save model every 10 epochs
+save_epoch: 5
+
+# Data-related parameters
+dl_num_workers: 4
+datasets:
+    train:
+        root_dir: 'data/sws2013'
+        labels_csv:
+            positive_labels: 'train_labels_pos.csv'
+            negative_labels: 'train_labels_neg.csv'
+            pos_sample_size: 1
+        query_dir: 'dev_queries'
+        audio_dir: 'Audio'
+        batch_size: 20
+
+    dev: 
+        root_dir: 'data/sws2013'
+        labels_csv: 'dev_labels.csv'
+        query_dir: 'dev_queries'
+        audio_dir: 'Audio'
+        batch_size: 200
