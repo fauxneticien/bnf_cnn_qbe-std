@@ -57,6 +57,8 @@ class ConvNet(nn.Module):
 
         return x
 
+# VGG code adapted from: https://github.com/MLSpeech/speech_yolo/blob/master/model_speech_yolo.py
+
 class VGG(nn.Module):
     def __init__(self, vgg_name):
         cfg = {
@@ -108,6 +110,8 @@ conv_block = nn.Sequential(nn.Conv2d(3,64,kernel_size=7, stride=2, padding=3, bi
                             nn.BatchNorm2d(64),
                             nn.ReLU(inplace=True),
                             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)) # 56,56
+
+# ResNet code adapted from: https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 
 class BasicBlock(nn.Module):
     def __init__(self, inplanes, planes, stride=1, downsample=None):

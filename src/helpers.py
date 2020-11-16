@@ -11,12 +11,15 @@ from tqdm import tqdm
 from Models import *
 from Datasets import STD_Dataset
 
+# Function to load YAML config file into a Python dict
 def load_parameters(yaml_path):
     with open(yaml_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     return config
 
+# Function to create PyTorch dataset objects from
+# list of datasets defined in YAML file (and loaded into a dict via load_parameters function)
 def load_std_datasets(datasets, apply_vad):
     return {
         ds_name:STD_Dataset(
@@ -28,6 +31,8 @@ def load_std_datasets(datasets, apply_vad):
         ) for (ds_name, ds_attrs) in datasets.items()
     }
 
+# Function to create PyTorch DataLoaders from PyTorch datasets
+# created via load_std_datasets function
 def create_data_loaders(loaded_datasets, config):
     return {
         ds_name:DataLoader(
@@ -38,6 +43,9 @@ def create_data_loaders(loaded_datasets, config):
         ) for (ds_name, dataset) in loaded_datasets.items()
     }
 
+# Function to load saved models to continue training from or for evaluation on test data
+# Expected input is a config dict with the model name (ConvNet, VGG, ResNet34) to paths(s)
+# to saved models.
 def load_saved_model(config):
 
     model, optimizer, criterion = instantiate_model(config)
@@ -54,6 +62,8 @@ def load_saved_model(config):
 
     return model, optimizer, criterion
 
+# Admin function to create output directory if necessary, set up log files, make a copy
+# of the config file, and create output CSV file of training predictions (if mode is training)
 def setup_exp(config):
     output_dir = config['artifacts']['dir']
 
@@ -78,6 +88,7 @@ def setup_exp(config):
     return output_dir
 
 def instantiate_model(config):
+    # Instantiate model based on string given in config file (ConvNet, VGG11, ResNet34)
     constructor = globals()[config['model_name']]
     model = constructor()
 
@@ -102,6 +113,7 @@ def instantiate_model(config):
         
         return model, None, None
 
+# Create CSV file with appropriate header for training/evaluation process to then append to.
 def make_results_csv(csv_path, headers = 'train'):
     if (headers == 'train'):
         csv_cols = ['epoch', 'query','reference','label','pred']
@@ -112,10 +124,13 @@ def make_results_csv(csv_path, headers = 'train'):
     t_df.to_csv(csv_path, index = False)
     return csv_path
 
+# Append to a pre-existing output CSV file
 def append_results_csv(csv_path, results_dict):
     df = pd.DataFrame(results_dict)
     df.to_csv(csv_path, mode = 'a', header = False, index = False)
 
+# Save model at checkpoints along with optimizer state etc so you can resume training
+# later
 def save_model(epoch, model, optimizer, loss, output_dir, name = 'model.pt'):
     cps_path = os.path.join(output_dir, 'checkpoints')
     cp_name  = "model-e%s.pt" % (str(epoch).zfill(3))
@@ -133,6 +148,7 @@ def save_model(epoch, model, optimizer, loss, output_dir, name = 'model.pt'):
         }, os.path.join(cps_path, cp_name)
     )
 
+# Helper function for running models (both training and evaluation)
 def run_model(model, mode, ds_loader, use_gpu, csv_path, keep_loss, criterion, optimizer, epoch):
     if keep_loss is True:
         total_loss = 0
@@ -140,33 +156,45 @@ def run_model(model, mode, ds_loader, use_gpu, csv_path, keep_loss, criterion, o
         # Set to None for referencing in return
         loss = None
 
+    # Iterate over mini batches suppied by the dataloader
     for batch_index, batch_data in enumerate(tqdm(ds_loader)):
         dists  = batch_data['dists']
         labels = batch_data['labels']
 
+        # Move data to GPU if desired
         if (use_gpu):
             dists, labels = dists.cuda(), labels.cuda()
 
+        # If training, set model to training mode and clear any accumulated gradients
         if(mode == 'train'):
             model.train()
             optimizer.zero_grad()
         
+        # Otherwise, set model to evaluation mode 
         elif(mode == 'eval'):
             model.eval()
 
+        # Make predictions
         outputs = model(dists)
 
+        # Add to epoch loss if keeping track of loss (e.g. for Dev data)
         if keep_loss is True:
             loss        = criterion(outputs, labels)
             total_loss += loss.cpu().data
 
+            # If in training mode, do backprop and optimisation step
             if(mode == 'train'):
                 loss.backward()
                 optimizer.step()
 
+        # Prepare to append to output CSV file, e.g.
+        ## | epoch | query | reference | label | pred |
+        ## |   1   | word1 | sentence1 |   1   | 0.99 |
         batch_output = {}
 
         if(epoch is not None):
+            # Repeat epoch for number of rows needed data frame
+            # e.g. epoch = 1 = [1, 1, ... 1, 1]
             batch_output['epoch'] = [epoch] * len(batch_data['query'])
 
         batch_output['query'] = batch_data['query']
@@ -174,6 +202,7 @@ def run_model(model, mode, ds_loader, use_gpu, csv_path, keep_loss, criterion, o
         batch_output['label'] = batch_data['labels'].reshape(-1).numpy().astype(int)
         batch_output['pred'] = outputs.cpu().detach().reshape(-1).numpy().round(10)
 
+        # Append to CSV
         append_results_csv(csv_path, batch_output)
 
     if keep_loss is True:
